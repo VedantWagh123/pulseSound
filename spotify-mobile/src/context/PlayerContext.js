@@ -1274,6 +1274,16 @@ export const PlayerProvider = ({ children }) => {
       try {
         incoming.volume = masterVol;
       } catch (_) {}
+      try {
+        if (typeof incoming.setActiveForLockScreen === 'function') {
+          incoming.setActiveForLockScreen(true, {
+            title: nextTrack?.name || 'Pulse Sound',
+            artist: nextTrack?.artist || 'Pulse Artist',
+            albumTitle: nextTrack?.album || 'Pulse Sound',
+            artworkUrl: typeof nextTrack?.image === 'string' ? nextTrack?.image : nextTrack?.image?.uri,
+          });
+        }
+      } catch (_) {}
     }
 
     crossfadeStateRef.current = {
@@ -1975,8 +1985,10 @@ export const PlayerProvider = ({ children }) => {
         if (typeof setAudioModeAsync === 'function') {
           await setAudioModeAsync({
             playsInSilentMode: true,
-            interruptionMode: 'doNotMix',
+            interruptionMode: 'doNotMixPersistent',
             shouldPlayInBackground: true,
+            allowsRecording: false,
+            shouldRouteThroughEarpiece: false,
           });
         }
       } catch (err) {
@@ -2258,6 +2270,20 @@ export const PlayerProvider = ({ children }) => {
       setTimeout(() => {
         applyAudioEffects(audioEffectsRef.current);
       }, 80);
+
+      // Activate lockscreen controls & persistent background media session (Android & iOS)
+      try {
+        if (typeof player.setActiveForLockScreen === 'function') {
+          player.setActiveForLockScreen(true, {
+            title: track?.name || 'Pulse Sound',
+            artist: track?.artist || 'Pulse Artist',
+            albumTitle: track?.album || 'Pulse Sound',
+            artworkUrl: typeof track?.image === 'string' ? track?.image : track?.image?.uri,
+          });
+        }
+      } catch (lockErr) {
+        console.log('Lock screen activation note:', lockErr?.message);
+      }
     } catch (err) {
       console.log('Native audio play error:', err?.message || err);
     }

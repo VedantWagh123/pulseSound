@@ -43,7 +43,12 @@
     },
     "plugins": [
       "./plugins/withPulseOverlay.js",
-      "expo-audio",
+      [
+        "expo-audio",
+        {
+          "enableBackgroundPlayback": true
+        }
+      ],
       [
         "expo-splash-screen",
         {

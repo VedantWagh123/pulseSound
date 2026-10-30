@@ -1,4 +1,4 @@
-import { Ytdl, chooseFormat } from '@distube/ytdl-core';
+import { Ytdl, chooseFormat, Client } from '@distube/ytdl-core';
 import { v2 as cloudinary } from 'cloudinary';
 import fs from 'fs';
 import { Readable } from 'stream';
@@ -8,6 +8,27 @@ import { uploadVideoFast } from './songController.js';
 
 // In-memory format cache to make stream resolutions instant (TTL 2 hours)
 const streamCache = new Map();
+
+// Helper to fetch YouTube video info safely without crashing worker threads or throwing player solve errors
+export const fetchYouTubeInfo = async (videoId) => {
+    // 1. Try VisionOS first (needs NO player script, immune to signature solver failures on cloud servers like Render)
+    try {
+        const ytdlVision = new Ytdl({
+            clients: [Client.VisionOS],
+            timeoutMs: 15000,
+        });
+        const info = await ytdlVision.getInfo(videoId);
+        if (info && Array.isArray(info.formats) && info.formats.length > 0) {
+            return info;
+        }
+    } catch (vErr) {
+        console.warn(`[YouTube Resolver] VisionOS client attempt failed for ${videoId}:`, vErr.message);
+    }
+
+    // 2. Fallback to default client resolver with 30s timeout
+    const ytdlDefault = new Ytdl({ timeoutMs: 30000 });
+    return await ytdlDefault.getInfo(videoId);
+};
 
 // Helper to extract 11-char YouTube Video ID from any URL or raw ID
 export const extractVideoId = (input) => {
@@ -54,8 +75,7 @@ export const resolveYouTube = async (req, res) => {
         let details = cached ? cached.details : null;
 
         if (!formatUrl || !details) {
-            const ytdl = new Ytdl();
-            const info = await ytdl.getInfo(videoId);
+            const info = await fetchYouTubeInfo(videoId);
 
             // Select highest quality audio-only format
             const format = chooseFormat(info.formats, {
@@ -158,8 +178,7 @@ export const proxyStream = async (req, res) => {
         if (cached && (Date.now() - cached.timestamp < 2 * 60 * 60 * 1000)) {
             streamUrl = cached.url;
         } else {
-            const ytdl = new Ytdl();
-            const info = await ytdl.getInfo(videoId);
+            const info = await fetchYouTubeInfo(videoId);
             const format = chooseFormat(info.formats, {
                 filter: (f) => f.hasAudio && !f.hasVideo,
                 quality: 'highestaudio',
@@ -218,8 +237,7 @@ export const downloadYouTube = async (req, res) => {
             streamUrl = cached.url;
             title = cached.details?.title || title;
         } else {
-            const ytdl = new Ytdl();
-            const info = await ytdl.getInfo(videoId);
+            const info = await fetchYouTubeInfo(videoId);
             const format = chooseFormat(info.formats, {
                 filter: (f) => f.hasAudio && !f.hasVideo,
                 quality: 'highestaudio',
@@ -308,8 +326,7 @@ export const importYouTubeAdmin = async (req, res) => {
             formatUrl = cached.url;
             details = cached.details;
         } else {
-            const ytdl = new Ytdl();
-            const info = await ytdl.getInfo(videoId);
+            const info = await fetchYouTubeInfo(videoId);
             const format = chooseFormat(info.formats, {
                 filter: (f) => f.hasAudio && !f.hasVideo,
                 quality: 'highestaudio',
