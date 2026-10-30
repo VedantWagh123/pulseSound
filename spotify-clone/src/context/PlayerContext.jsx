@@ -9,7 +9,7 @@ const PlayerContextProvider = (props) => {
     const audioRef = useRef();
     const seekBg = useRef();
     const seekBar = useRef();
-    const url = 'http://localhost:4000'
+    const url = import.meta.env.VITE_BACKEND_URL || 'https://pulsesound.onrender.com'
 
     // Format local dummy data so both _id and id work, and each song has an assigned album
     const formattedLocalAlbums = localAlbumsData.map((item) => ({

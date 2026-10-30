@@ -12,7 +12,7 @@ import ImportYouTube from './pages/ImportYouTube/ImportYouTube';
 import Sidebar from './components/Sidebar/Sidebar';
 import Navbar from './components/Navbar/Navbar';
 
-export const url = 'http://localhost:4000';
+export const url = import.meta.env.VITE_BACKEND_URL || 'https://pulsesound.onrender.com';
 
 const App = () => {
   return (

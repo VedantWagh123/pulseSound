@@ -20,21 +20,24 @@ export const getCandidateHosts = () => {
   const expoHost = getHostFromExpo();
   const list = [];
 
-  // 1. Host where Expo bundle was loaded from (exact developer machine IP)
+  // 1. Primary Cloud Production Server (Render)
+  list.push('https://pulsesound.onrender.com');
+
+  // 2. Host where Expo bundle was loaded from (exact developer machine IP)
   if (expoHost) {
     list.push(`http://${expoHost}:4000`);
   }
 
-  // 2. Active Metro LAN IP
+  // 3. Active Metro LAN IP
   list.push('http://10.99.82.4:4000');
   list.push('http://10.78.124.4:4000');
 
-  // 3. Android Emulator loopback
+  // 4. Android Emulator loopback
   if (Platform.OS === 'android') {
     list.push('http://10.0.2.2:4000');
   }
 
-  // 4. Localhost for Web / Simulator
+  // 5. Localhost for Web / Simulator
   list.push('http://localhost:4000');
 
   return Array.from(new Set(list));
@@ -199,7 +202,7 @@ export const fetchLiveBackendData = async () => {
   for (const host of uniqueHosts) {
     try {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 3500);
+      const timer = setTimeout(() => controller.abort(), 10000);
 
       // Fetch albums, songs, and public playlists simultaneously in parallel
       const [albumsRes, songsRes, playlistsRes] = await Promise.all([

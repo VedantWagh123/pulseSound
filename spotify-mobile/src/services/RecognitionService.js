@@ -25,7 +25,7 @@ export const getActiveBackendHost = async () => {
       }
     } catch (_) {}
   }
-  return hosts[0] || 'http://localhost:4000';
+  return hosts[0] || 'https://pulsesound.onrender.com';
 };
 
 /**
