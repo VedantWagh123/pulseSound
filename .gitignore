@@ -1,0 +1,48 @@
+# Root .gitignore for PulseSound Full-Stack (Backend, Admin, Web, Mobile)
+
+# Dependencies
+node_modules/
+*/node_modules/
+*/*/node_modules/
+
+# Environment Variables & Secrets (CRITICAL for security)
+.env
+.env.*
+!.env.example
+*/.env
+*/.env.*
+!*/.env.example
+
+# Expo & Mobile builds
+.expo/
+*/.expo/
+dist/
+*/dist/
+web-build/
+*/web-build/
+.kotlin/
+*/.kotlin/
+
+# Android / iOS generated builds
+android/
+ios/
+*/android/
+*/ios/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Logs & Cache
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Audio / Video temp assets
+*.tmp
