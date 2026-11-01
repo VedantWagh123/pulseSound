@@ -45,6 +45,31 @@ export const getCandidateHosts = () => {
 
 let cachedWorkingHost = null;
 
+// ─── Render Cold-Start Killer ────────────────────────────────────────────────
+// App launch hote hi Render backend ko ping karo — free tier 15min baad sleep
+// jaata hai, yeh warmup request usse jagate rehta hai silently.
+export const warmUpBackend = () => {
+  const RENDER_HOST = 'https://pulsesound.onrender.com';
+  // Fire-and-forget — no await, no crash on fail
+  fetch(`${RENDER_HOST}/api/song/list`, {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(8000),
+  }).catch(() => {});
+};
+
+// Keep Render warm every 9 minutes (free tier sleeps after ~15 min inactivity)
+let _keepAliveInterval = null;
+export const startKeepAlive = () => {
+  if (_keepAliveInterval) return;
+  warmUpBackend(); // immediate ping
+  _keepAliveInterval = setInterval(() => {
+    fetch('https://pulsesound.onrender.com/api/song/list', {
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(6000),
+    }).catch(() => {});
+  }, 9 * 60 * 1000); // every 9 min
+};
+
 // Normalize backend album object for Pulse Sound UI
 export const normalizeBackendAlbum = (album, index = 0) => {
   const imageSource = typeof album.image === 'string'
@@ -202,7 +227,8 @@ export const fetchLiveBackendData = async () => {
   for (const host of uniqueHosts) {
     try {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 10000);
+      // 6s timeout — Render warms up in ~3-5s once alive; cold-start handled by warmUpBackend()
+      const timer = setTimeout(() => controller.abort(), 6000);
 
       // Fetch albums, songs, and public playlists simultaneously in parallel
       const [albumsRes, songsRes, playlistsRes] = await Promise.all([

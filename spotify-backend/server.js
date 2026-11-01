@@ -25,6 +25,22 @@ connectDB();
 app.use(express.json());
 app.use(cors());
 
+// ─── HTTP Cache Headers for Static Catalogue Endpoints ───────────────────────
+// Songs, albums, playlists rarely change — cache them 60s on client + CDN edge.
+// This makes the app feel Spotify-fast: second open loads instantly from cache.
+app.use('/api/song/list', (req, res, next) => {
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=30');
+    next();
+});
+app.use('/api/album/list', (req, res, next) => {
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=30');
+    next();
+});
+app.use('/api/playlist/list', (req, res, next) => {
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=30');
+    next();
+});
+
 // Global Rate Limiter: max 120 reqs/minute
 app.use(rateLimiter({ max: 120, message: "Too many requests. Please slow down." }));
 

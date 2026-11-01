@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { albumsData } from '../assets/assets';
 import { Asset } from 'expo-asset';
 import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
-import { fetchLiveBackendData, deduplicateSongs, isMockOrLegacySong } from '../config/api';
+import { fetchLiveBackendData, deduplicateSongs, isMockOrLegacySong, startKeepAlive } from '../config/api';
 import {
   getStoredDownloads,
   reconcileDownloads,
@@ -1274,16 +1274,24 @@ export const PlayerProvider = ({ children }) => {
       try {
         incoming.volume = masterVol;
       } catch (_) {}
-      try {
-        if (typeof incoming.setActiveForLockScreen === 'function') {
-          incoming.setActiveForLockScreen(true, {
-            title: nextTrack?.name || 'Pulse Sound',
-            artist: nextTrack?.artist || 'Pulse Artist',
-            albumTitle: nextTrack?.album || 'Pulse Sound',
-            artworkUrl: typeof nextTrack?.image === 'string' ? nextTrack?.image : nextTrack?.image?.uri,
-          });
+      // Delayed lockscreen activation for crossfade incoming player
+      const _activateCrossfadeLockScreen = (attempt = 0) => {
+        try {
+          if (typeof incoming.setActiveForLockScreen === 'function') {
+            incoming.setActiveForLockScreen(true, {
+              title: nextTrack?.name || 'Pulse Sound',
+              artist: nextTrack?.artist || 'Pulse Artist',
+              albumTitle: nextTrack?.album || 'Pulse Sound',
+              artworkUrl: typeof nextTrack?.image === 'string' ? nextTrack?.image : nextTrack?.image?.uri,
+            });
+          }
+        } catch (_) {
+          if (attempt < 3) {
+            setTimeout(() => _activateCrossfadeLockScreen(attempt + 1), 1500);
+          }
         }
-      } catch (_) {}
+      };
+      setTimeout(() => _activateCrossfadeLockScreen(0), 1500);
     }
 
     crossfadeStateRef.current = {
@@ -1981,6 +1989,9 @@ export const PlayerProvider = ({ children }) => {
   useEffect(() => {
     let isMounted = true;
     const initializeAudio = async () => {
+      // Warm up Render backend immediately + keep alive every 9 min
+      startKeepAlive();
+
       try {
         if (typeof setAudioModeAsync === 'function') {
           await setAudioModeAsync({
@@ -2272,18 +2283,25 @@ export const PlayerProvider = ({ children }) => {
       }, 80);
 
       // Activate lockscreen controls & persistent background media session (Android & iOS)
-      try {
-        if (typeof player.setActiveForLockScreen === 'function') {
-          player.setActiveForLockScreen(true, {
-            title: track?.name || 'Pulse Sound',
-            artist: track?.artist || 'Pulse Artist',
-            albumTitle: track?.album || 'Pulse Sound',
-            artworkUrl: typeof track?.image === 'string' ? track?.image : track?.image?.uri,
-          });
+      // Delayed with retry so Android AudioControlsService has time to bind first
+      const _activateLockScreen = (attempt = 0) => {
+        try {
+          if (typeof player.setActiveForLockScreen === 'function') {
+            player.setActiveForLockScreen(true, {
+              title: track?.name || 'Pulse Sound',
+              artist: track?.artist || 'Pulse Artist',
+              albumTitle: track?.album || 'Pulse Sound',
+              artworkUrl: typeof track?.image === 'string' ? track?.image : track?.image?.uri,
+            });
+          }
+        } catch (lockErr) {
+          console.log('Lock screen activation note (attempt ' + attempt + '):', lockErr?.message);
+          if (attempt < 3) {
+            setTimeout(() => _activateLockScreen(attempt + 1), 1500);
+          }
         }
-      } catch (lockErr) {
-        console.log('Lock screen activation note:', lockErr?.message);
-      }
+      };
+      setTimeout(() => _activateLockScreen(0), 1500);
     } catch (err) {
       console.log('Native audio play error:', err?.message || err);
     }
