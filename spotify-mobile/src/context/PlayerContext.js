@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { albumsData } from '../assets/assets';
 import { Asset } from 'expo-asset';
 import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
-import { fetchLiveBackendData, deduplicateSongs, isMockOrLegacySong, startKeepAlive } from '../config/api';
+import { fetchLiveBackendData, deduplicateSongs, isMockOrLegacySong, startKeepAlive, resolveYouTubeTrack } from '../config/api';
 import {
   getStoredDownloads,
   reconcileDownloads,
@@ -1340,7 +1340,7 @@ export const PlayerProvider = ({ children }) => {
 
     try {
       // 1. Resolve audio source for incoming track (uses local cache if available)
-      const nextSource = await resolveTrackSource(nextTrack.file, nextId);
+      const nextSource = await resolveTrackSource(nextTrack.file, nextId, nextTrack);
       if (!nextSource) {
         cancelCrossfade();
         return;
@@ -2026,7 +2026,7 @@ export const PlayerProvider = ({ children }) => {
   }, []);
 
   // Helper to resolve an audio source for native playback (Offline-first: checks local disk first!)
-  const resolveTrackSource = async (file, songId = null) => {
+  const resolveTrackSource = async (file, songId = null, track = null) => {
     // 1. Check if track is downloaded or cached locally
     if (songId !== null && songId !== undefined) {
       try {
@@ -2037,7 +2037,7 @@ export const PlayerProvider = ({ children }) => {
       } catch (_) {}
     }
 
-    if (!file) return null;
+    if (!file && !track?.youtubeVideoId) return null;
     if (typeof file === 'number') {
       try {
         const asset = Asset.fromModule(file);
@@ -2052,13 +2052,41 @@ export const PlayerProvider = ({ children }) => {
       }
       return file;
     }
-    if (typeof file === 'string') {
-      const cleanUrl = file.includes('/br_')
-        ? file.replace(/\/br_[0-9]+k,?[^/]*\//, '/')
-        : file;
+
+    let streamUrl = typeof file === 'string' ? file : '';
+
+    // 2. Auto-refresh expired YouTube stream URLs
+    const isGoogleVideo = typeof streamUrl === 'string' && streamUrl.includes('googlevideo.com');
+    const expireMatch = typeof streamUrl === 'string' && streamUrl.match(/[?&]expire=([0-9]+)/);
+    const isExpired = expireMatch && (parseInt(expireMatch[1], 10) * 1000 <= Date.now() + 60000);
+    const ytVideoId = track?.youtubeVideoId;
+
+    if ((isGoogleVideo && isExpired) || (!streamUrl && ytVideoId)) {
+      if (ytVideoId) {
+        try {
+          console.log('Auto-refreshing expired stream for YouTube song:', track?.name || ytVideoId);
+          const resolved = await resolveYouTubeTrack(ytVideoId);
+          if (resolved?.success && resolved?.song?.file) {
+            streamUrl = resolved.song.file;
+            if (track) {
+              track.file = streamUrl;
+              track.streamUrl96k = streamUrl;
+              track.streamUrl128k = streamUrl;
+            }
+          }
+        } catch (resErr) {
+          console.log('Stream auto-refresh warning:', resErr?.message);
+        }
+      }
+    }
+
+    if (typeof streamUrl === 'string' && streamUrl) {
+      const cleanUrl = streamUrl.includes('/br_')
+        ? streamUrl.replace(/\/br_[0-9]+k,?[^/]*\//, '/')
+        : streamUrl;
       return { uri: cleanUrl };
     }
-    return file;
+    return streamUrl || file;
   };
 
   const setupPlayerListeners = (player) => {
@@ -2219,7 +2247,7 @@ export const PlayerProvider = ({ children }) => {
     if (!track) return;
     try {
       const trackId = track._id || track.id;
-      const source = await resolveTrackSource(track.file, trackId);
+      const source = await resolveTrackSource(track.file, trackId, track);
       const targetVol = normalizeVolumeRef.current ? 0.88 : 1.0;
 
       let player = nativePlayerRef.current;
