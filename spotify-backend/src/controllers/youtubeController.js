@@ -9,53 +9,38 @@ import { uploadVideoFast } from './songController.js';
 // In-memory format cache to make stream resolutions instant (TTL 2 hours)
 const streamCache = new Map();
 
-// Helper to fetch YouTube video info safely without crashing worker threads or throwing player solve errors
-// Uses Smart TV client (Client.Tv) which bypasses datacenter bot detection ('Sign in to confirm you're not a bot')
+// Helper to fetch YouTube video info safely and quickly across cloud environments like Render
+// Single Ytdl instance with VisionOS (ultra-fast, no player needed for music) + TV (bypasses bot verification) + WebEmbedded
 export const fetchYouTubeInfo = async (videoId) => {
-    // 1. Try Smart TV client first (bypasses bot verification & login requirement on cloud servers like Render)
+    try {
+        const ytdl = new Ytdl({
+            clients: [Client.VisionOS, Client.Tv, Client.WebEmbedded],
+            timeoutMs: 14000,
+        });
+        const info = await ytdl.getInfo(videoId);
+        if (info && Array.isArray(info.formats) && info.formats.length > 0) {
+            return info;
+        }
+    } catch (err) {
+        console.warn(`[YouTube Resolver] Fast multi-client failed for ${videoId}:`, err.message);
+    }
+
+    // Fallback: try TV client alone if bot verification was triggered
     try {
         const ytdlTv = new Ytdl({
             clients: [Client.Tv],
-            timeoutMs: 15000,
+            timeoutMs: 12000,
         });
         const info = await ytdlTv.getInfo(videoId);
         if (info && Array.isArray(info.formats) && info.formats.length > 0) {
             return info;
         }
     } catch (tvErr) {
-        console.warn(`[YouTube Resolver] TV client attempt failed for ${videoId}:`, tvErr.message);
+        console.warn(`[YouTube Resolver] TV fallback failed for ${videoId}:`, tvErr.message);
     }
 
-    // 2. Try WebEmbedded client
-    try {
-        const ytdlEmbed = new Ytdl({
-            clients: [Client.WebEmbedded],
-            timeoutMs: 15000,
-        });
-        const info = await ytdlEmbed.getInfo(videoId);
-        if (info && Array.isArray(info.formats) && info.formats.length > 0) {
-            return info;
-        }
-    } catch (embedErr) {
-        console.warn(`[YouTube Resolver] WebEmbedded client attempt failed for ${videoId}:`, embedErr.message);
-    }
-
-    // 3. Try VisionOS client
-    try {
-        const ytdlVision = new Ytdl({
-            clients: [Client.VisionOS],
-            timeoutMs: 15000,
-        });
-        const info = await ytdlVision.getInfo(videoId);
-        if (info && Array.isArray(info.formats) && info.formats.length > 0) {
-            return info;
-        }
-    } catch (vErr) {
-        console.warn(`[YouTube Resolver] VisionOS client attempt failed for ${videoId}:`, vErr.message);
-    }
-
-    // 4. Fallback to default client resolver
-    const ytdlDefault = new Ytdl({ timeoutMs: 30000 });
+    // Ultimate fallback to default client
+    const ytdlDefault = new Ytdl({ timeoutMs: 20000 });
     return await ytdlDefault.getInfo(videoId);
 };
 
