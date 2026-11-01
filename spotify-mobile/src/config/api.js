@@ -49,25 +49,38 @@ let cachedWorkingHost = null;
 // App launch hote hi Render backend ko ping karo — free tier 15min baad sleep
 // jaata hai, yeh warmup request usse jagate rehta hai silently.
 export const warmUpBackend = () => {
-  const RENDER_HOST = 'https://pulsesound.onrender.com';
-  // Fire-and-forget — no await, no crash on fail
-  fetch(`${RENDER_HOST}/api/song/list`, {
-    headers: { Accept: 'application/json' },
-    signal: AbortSignal.timeout(8000),
-  }).catch(() => {});
+  try {
+    const RENDER_HOST = 'https://pulsesound.onrender.com';
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    fetch(`${RENDER_HOST}/api/song/list`, {
+      headers: { Accept: 'application/json' },
+      signal: controller.signal,
+    })
+      .then(() => clearTimeout(timer))
+      .catch(() => clearTimeout(timer));
+  } catch (_) {}
 };
 
 // Keep Render warm every 9 minutes (free tier sleeps after ~15 min inactivity)
 let _keepAliveInterval = null;
 export const startKeepAlive = () => {
-  if (_keepAliveInterval) return;
-  warmUpBackend(); // immediate ping
-  _keepAliveInterval = setInterval(() => {
-    fetch('https://pulsesound.onrender.com/api/song/list', {
-      headers: { Accept: 'application/json' },
-      signal: AbortSignal.timeout(6000),
-    }).catch(() => {});
-  }, 9 * 60 * 1000); // every 9 min
+  try {
+    if (_keepAliveInterval) return;
+    warmUpBackend(); // immediate ping
+    _keepAliveInterval = setInterval(() => {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 6000);
+        fetch('https://pulsesound.onrender.com/api/song/list', {
+          headers: { Accept: 'application/json' },
+          signal: controller.signal,
+        })
+          .then(() => clearTimeout(timer))
+          .catch(() => clearTimeout(timer));
+      } catch (_) {}
+    }, 9 * 60 * 1000); // every 9 min
+  } catch (_) {}
 };
 
 // Resilient backend streaming proxy URL for YouTube tracks (bypasses Google's 403 IP locks)

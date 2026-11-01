@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { albumsData } from '../assets/assets';
 import { Asset } from 'expo-asset';
 import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
-import { fetchLiveBackendData, deduplicateSongs, isMockOrLegacySong, startKeepAlive, resolveYouTubeTrack, getYouTubeProxyStreamUrl } from '../config/api';
+import { fetchLiveBackendData, deduplicateSongs, isMockOrLegacySong, startKeepAlive, resolveYouTubeTrack } from '../config/api';
 import {
   getStoredDownloads,
   reconcileDownloads,
