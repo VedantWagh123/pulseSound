@@ -183,6 +183,8 @@ export const normalizeBackendSong = (song, index = 0) => {
     streamUrl128k: song.streamUrl128k || song.file,
     originalFile: song.originalFile || song.file,
     fileSize: song.fileSize || 0,
+    youtubeVideoId: song.youtubeVideoId || '',
+    isYoutubeSong: Boolean(song.isYoutubeSong || song.youtubeVideoId),
     isBackend: true,
   };
 };
