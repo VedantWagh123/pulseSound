@@ -189,9 +189,11 @@ export const proxyStream = async (req, res) => {
 
         let streamUrl = null;
         const cached = streamCache.get(videoId);
-        if (cached && (Date.now() - cached.timestamp < 2 * 60 * 60 * 1000)) {
+        if (cached && (Date.now() - cached.timestamp < 60 * 60 * 1000)) {
             streamUrl = cached.url;
-        } else {
+        }
+
+        const getFreshFormat = async () => {
             const info = await fetchYouTubeInfo(videoId);
             const format = chooseFormat(info.formats, {
                 filter: (f) => f.hasAudio && !f.hasVideo,
@@ -201,9 +203,14 @@ export const proxyStream = async (req, res) => {
                 quality: 'highestaudio',
             });
             if (format?.url) {
-                streamUrl = format.url;
                 streamCache.set(videoId, { url: format.url, details: {}, timestamp: Date.now() });
+                return format.url;
             }
+            return null;
+        };
+
+        if (!streamUrl) {
+            streamUrl = await getFreshFormat();
         }
 
         if (!streamUrl) {
@@ -215,13 +222,29 @@ export const proxyStream = async (req, res) => {
             headers.range = req.headers.range;
         }
 
-        const upstream = await fetch(streamUrl, { headers });
+        let upstream = await fetch(streamUrl, { headers });
+
+        // If upstream expired (403 Forbidden), evict cache and retry once with fresh stream
+        if (upstream.status === 403 || !upstream.ok) {
+            console.log(`[ProxyStream] Stream expired/rejected (HTTP ${upstream.status}) for ${videoId}, re-fetching fresh format...`);
+            streamCache.delete(videoId);
+            streamUrl = await getFreshFormat();
+            if (streamUrl) {
+                upstream = await fetch(streamUrl, { headers });
+            }
+        }
+
+        if (!upstream || !upstream.ok) {
+            return res.status(upstream?.status || 500).send("Upstream audio stream unavailable");
+        }
+
         res.status(upstream.status);
         for (const [key, val] of upstream.headers.entries()) {
             if (['content-range', 'content-length', 'content-type', 'accept-ranges'].includes(key.toLowerCase())) {
                 res.setHeader(key, val);
             }
         }
+
         if (upstream.body) {
             Readable.fromWeb(upstream.body).pipe(res);
         } else {
@@ -230,7 +253,7 @@ export const proxyStream = async (req, res) => {
     } catch (error) {
         console.error("YouTube Proxy Stream Error:", error.message);
         if (!res.headersSent) {
-            res.status(500).send("Stream error");
+            res.status(500).send("Stream error: " + error.message);
         }
     }
 };

@@ -70,6 +70,12 @@ export const startKeepAlive = () => {
   }, 9 * 60 * 1000); // every 9 min
 };
 
+// Resilient backend streaming proxy URL for YouTube tracks (bypasses Google's 403 IP locks)
+export const getYouTubeProxyStreamUrl = (videoId) => {
+  const host = cachedWorkingHost || 'https://pulsesound.onrender.com';
+  return `${host}/api/youtube/stream/${videoId}`;
+};
+
 // Normalize backend album object for Pulse Sound UI
 export const normalizeBackendAlbum = (album, index = 0) => {
   const imageSource = typeof album.image === 'string'
