@@ -1274,24 +1274,7 @@ export const PlayerProvider = ({ children }) => {
       try {
         incoming.volume = masterVol;
       } catch (_) {}
-      // Delayed lockscreen activation for crossfade incoming player
-      const _activateCrossfadeLockScreen = (attempt = 0) => {
-        try {
-          if (typeof incoming.setActiveForLockScreen === 'function') {
-            incoming.setActiveForLockScreen(true, {
-              title: nextTrack?.name || 'Pulse Sound',
-              artist: nextTrack?.artist || 'Pulse Artist',
-              albumTitle: nextTrack?.album || 'Pulse Sound',
-              artworkUrl: typeof nextTrack?.image === 'string' ? nextTrack?.image : nextTrack?.image?.uri,
-            });
-          }
-        } catch (_) {
-          if (attempt < 3) {
-            setTimeout(() => _activateCrossfadeLockScreen(attempt + 1), 1500);
-          }
-        }
-      };
-      setTimeout(() => _activateCrossfadeLockScreen(0), 1500);
+
     }
 
     crossfadeStateRef.current = {
@@ -2310,26 +2293,7 @@ export const PlayerProvider = ({ children }) => {
         applyAudioEffects(audioEffectsRef.current);
       }, 80);
 
-      // Activate lockscreen controls & persistent background media session (Android & iOS)
-      // Delayed with retry so Android AudioControlsService has time to bind first
-      const _activateLockScreen = (attempt = 0) => {
-        try {
-          if (typeof player.setActiveForLockScreen === 'function') {
-            player.setActiveForLockScreen(true, {
-              title: track?.name || 'Pulse Sound',
-              artist: track?.artist || 'Pulse Artist',
-              albumTitle: track?.album || 'Pulse Sound',
-              artworkUrl: typeof track?.image === 'string' ? track?.image : track?.image?.uri,
-            });
-          }
-        } catch (lockErr) {
-          console.log('Lock screen activation note (attempt ' + attempt + '):', lockErr?.message);
-          if (attempt < 3) {
-            setTimeout(() => _activateLockScreen(attempt + 1), 1500);
-          }
-        }
-      };
-      setTimeout(() => _activateLockScreen(0), 1500);
+
     } catch (err) {
       console.log('Native audio play error:', err?.message || err);
     }

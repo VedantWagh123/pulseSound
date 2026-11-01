@@ -10,8 +10,37 @@ import { uploadVideoFast } from './songController.js';
 const streamCache = new Map();
 
 // Helper to fetch YouTube video info safely without crashing worker threads or throwing player solve errors
+// Uses Smart TV client (Client.Tv) which bypasses datacenter bot detection ('Sign in to confirm you're not a bot')
 export const fetchYouTubeInfo = async (videoId) => {
-    // 1. Try VisionOS first (needs NO player script, immune to signature solver failures on cloud servers like Render)
+    // 1. Try Smart TV client first (bypasses bot verification & login requirement on cloud servers like Render)
+    try {
+        const ytdlTv = new Ytdl({
+            clients: [Client.Tv],
+            timeoutMs: 15000,
+        });
+        const info = await ytdlTv.getInfo(videoId);
+        if (info && Array.isArray(info.formats) && info.formats.length > 0) {
+            return info;
+        }
+    } catch (tvErr) {
+        console.warn(`[YouTube Resolver] TV client attempt failed for ${videoId}:`, tvErr.message);
+    }
+
+    // 2. Try WebEmbedded client
+    try {
+        const ytdlEmbed = new Ytdl({
+            clients: [Client.WebEmbedded],
+            timeoutMs: 15000,
+        });
+        const info = await ytdlEmbed.getInfo(videoId);
+        if (info && Array.isArray(info.formats) && info.formats.length > 0) {
+            return info;
+        }
+    } catch (embedErr) {
+        console.warn(`[YouTube Resolver] WebEmbedded client attempt failed for ${videoId}:`, embedErr.message);
+    }
+
+    // 3. Try VisionOS client
     try {
         const ytdlVision = new Ytdl({
             clients: [Client.VisionOS],
@@ -25,7 +54,7 @@ export const fetchYouTubeInfo = async (videoId) => {
         console.warn(`[YouTube Resolver] VisionOS client attempt failed for ${videoId}:`, vErr.message);
     }
 
-    // 2. Fallback to default client resolver with 30s timeout
+    // 4. Fallback to default client resolver
     const ytdlDefault = new Ytdl({ timeoutMs: 30000 });
     return await ytdlDefault.getInfo(videoId);
 };

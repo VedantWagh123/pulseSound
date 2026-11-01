@@ -15,6 +15,7 @@ const withPulseOverlayManifest = (config) => {
       'android.permission.SYSTEM_ALERT_WINDOW',
       'android.permission.RECORD_AUDIO',
       'android.permission.FOREGROUND_SERVICE',
+      'android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK',
       'android.permission.FOREGROUND_SERVICE_MICROPHONE',
       'android.permission.FOREGROUND_SERVICE_SPECIAL_USE',
       'android.permission.POST_NOTIFICATIONS',
