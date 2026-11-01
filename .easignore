@@ -1,0 +1,10 @@
+spotify-admin/
+spotify-backend/
+spotify-clone/
+.git/
+*.mp3
+*.wav
+node_modules/
+dist/
+.expo/
+web-build/
