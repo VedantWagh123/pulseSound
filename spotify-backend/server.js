@@ -66,7 +66,8 @@ app.get("/", (req, res) => {
     res.json({
         status: "Online",
         service: "Pulse Sound Music API",
-        version: "1.0.0",
+        version: "1.0.1",
+        build: "2c9379e-tv-client",
         mongoConnected: mongoose.connection.readyState === 1,
         endpoints: {
             songs: "/api/song/list",
